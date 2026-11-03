@@ -20,7 +20,10 @@ class Response:
         return self._body
 
     def iter_content(self, size):
-        yield self._content
+        if isinstance(self._content, Exception):
+            yield b'II*\x00'
+            raise self._content
+        yield from (self._content if isinstance(self._content, list) else [self._content])
 
     def close(self):
         pass
@@ -167,7 +170,7 @@ def test_wait_times_out():
 def test_wait_raises_on_other_http_errors():
     job, _ = make_job({('GET', STAC): Response(500, {})})
     with pytest.raises(GammaEarthError):
-        job.wait(sleep=lambda s: None)
+        job.wait(**ticking())
 
 
 # --- download -----------------------------------------------------------------------------------------------------
@@ -189,7 +192,7 @@ def test_download_sends_the_key_to_the_api_and_never_to_the_signed_address(tmp_p
     api_call = next(kw for m, u, kw in s.calls if u.startswith(API))
     cf_call = next(kw for m, u, kw in s.calls if u == CF)
     assert api_call['headers'] == {'X-API-Key': KEY} and api_call['allow_redirects'] is False
-    assert 'headers' not in cf_call and KEY not in repr(cf_call)
+    assert cf_call['headers'] == {'Accept-Encoding': 'identity'} and KEY not in repr(cf_call)
     assert not list(tmp_path.glob('*.part'))
 
 
@@ -250,3 +253,120 @@ def test_job_download_waits_then_downloads(tmp_path):
     job, _ = make_job({('GET', STAC): Response(200, collection(feature(('tci',)))), **asset_route()})
     (path,) = job.download(tmp_path, assets=['tci'])
     assert path.read_bytes() == TIFF
+
+
+# --- review round: redirects, file names, interrupted streams, transient errors ---------------------------------------
+
+def test_no_request_that_carries_the_key_follows_a_redirect(tmp_path):
+    job, s = make_job({('GET', STAC): Response(200, collection(feature(('tci',)))), **asset_route()})
+    job.download(tmp_path, assets=['tci'])
+    assert s.calls and all(kw['allow_redirects'] is False for _, _, kw in s.calls)
+
+
+@pytest.mark.parametrize('where', ['submit', 'collection', 'status'])
+def test_a_redirect_from_the_api_is_an_error_and_is_not_followed(where):
+    away = Response(307, headers={'Location': 'https://evil.example/'})
+    c, s = client({('POST', f'{API}/jobs/{KEY}'): away if where == 'submit' else Response(200, CREATED),
+                   ('GET', STAC): away if where == 'collection' else Response(200, collection()),
+                   ('GET', STATUS): away})
+    with pytest.raises(GammaEarthError):
+        if where == 'submit':
+            c.submit('1 2 3 4', '2024-06-15')
+        elif where == 'collection':
+            c.submit('1 2 3 4', '2024-06-15').collection()
+        else:
+            c.submit('1 2 3 4', '2024-06-15').status()
+    assert all('evil.example' not in u for _, u, _ in s.calls)
+
+
+@pytest.mark.parametrize('bad_id', ['../../x', 'a/b', '.hidden', 'x y', '', 'a' * 200])
+def test_an_item_id_that_is_not_safe_in_a_file_name_is_refused_before_any_request(tmp_path, bad_id):
+    import pystac
+    doc = collection(feature(('tci',)))
+    doc['features'][0]['id'] = bad_id
+    c, s = client({})
+    with pytest.raises(GammaEarthError):
+        c.download(pystac.ItemCollection.from_dict(doc), tmp_path)
+    assert s.calls == [] and list(tmp_path.iterdir()) == []
+
+
+def test_a_missing_asset_is_found_before_anything_is_downloaded(tmp_path):
+    c, s = client(asset_route())
+    with pytest.raises(GammaEarthError):
+        c.download(items('tci'), tmp_path, assets=['tci', 'ndvi'])
+    assert s.calls == [] and list(tmp_path.iterdir()) == []
+
+
+def test_an_interrupted_download_leaves_no_file_and_no_signed_address_in_the_error(tmp_path):
+    routes = asset_route()
+    routes[('GET', CF)] = Response(200, headers={'Content-Length': '999'}, content=requests.exceptions.ChunkedEncodingError(CF))
+    c, _ = client(routes)
+    with pytest.raises(GammaEarthError) as e:
+        c.download(items('tci'), tmp_path)
+    assert 'Signature' not in str(e.value) and list(tmp_path.iterdir()) == []
+
+
+def test_a_bad_content_length_and_a_tiny_first_chunk_are_not_a_failure(tmp_path):
+    routes = asset_route()
+    routes[('GET', CF)] = Response(200, headers={'Content-Length': 'abc'}, content=[b'II', b'*\x00', b'rest'])
+    c, _ = client(routes)
+    (path,) = c.download(items('tci'), tmp_path)
+    assert path.read_bytes() == b'II*\x00rest'
+
+
+def test_wait_rides_out_a_few_transient_errors():
+    job, _ = make_job({
+        ('GET', STAC): [Response(502, {}), requests.ConnectionError('boom'), Response(200, collection(feature()))],
+        ('GET', STATUS): Response(200, {'state': '50%'})})
+    assert len(job.wait(**ticking()).items) == 1
+
+
+def test_wait_gives_up_after_too_many_transient_errors():
+    from gamma_earth.client import TransientError
+    job, _ = make_job({('GET', STAC): Response(503, {}), ('GET', STATUS): Response(200, {'state': '50%'})})
+    with pytest.raises(TransientError):          # not a timeout: it gave up on the errors
+        job.wait(**ticking())
+
+
+def test_a_client_error_is_not_retried():
+    job, s = make_job({('GET', STAC): Response(401, {}), ('GET', STATUS): Response(200, {'state': '50%'})})
+    with pytest.raises(GammaEarthError):
+        job.wait(**ticking())
+    assert sum(1 for _, u, _ in s.calls if u == STAC) == 1
+
+
+def test_a_completed_job_without_a_product_is_reported_as_such_not_as_a_timeout():
+    job, _ = make_job({('GET', STAC): Response(404, {}), ('GET', STATUS): Response(200, {'state': 'completed'})})
+    with pytest.raises(GammaEarthError) as e:
+        job.wait(**ticking())
+    assert not isinstance(e.value, JobTimeout) and 'completed' in str(e.value)
+
+
+def test_a_percent_encoded_key_is_scrubbed_too():
+    from urllib.parse import quote
+    odd = 'k+/' * 8 + 'z'
+    c = Client(API, odd, session=Session({('POST', f'{API}/jobs/{quote(odd, safe="")}'): requests.ConnectionError(
+        f'could not reach {API}/jobs/{quote(odd, safe="")} and {quote(odd)}')}))
+    with pytest.raises(GammaEarthError) as e:
+        c.submit('1 2 3 4', '2024-06-15')
+    assert odd not in str(e.value) and quote(odd, safe='') not in str(e.value) and quote(odd) not in str(e.value)
+
+
+def test_a_lost_answer_to_submit_warns_that_the_job_may_exist():
+    c, _ = client({('POST', f'{API}/jobs/{KEY}'): requests.ReadTimeout('slow')})
+    with pytest.raises(GammaEarthError) as e:
+        c.submit('1 2 3 4', '2024-06-15')
+    assert 'may have been created' in str(e.value)
+
+
+@pytest.mark.parametrize('bad', ['x/../y', 'a?b', 'a#b', '', 'a b'])
+def test_a_job_id_that_is_not_a_plain_id_is_refused(bad):
+    c, _ = client({})
+    with pytest.raises(ValueError):
+        c.job(bad)
+
+
+def ticking():
+    """A fake clock and the sleep that advances it, so a wait() that fails to stop times out instead of hanging."""
+    now = [0.0]
+    return dict(timeout=300, poll=20, sleep=lambda s: now.__setitem__(0, now[0] + s), clock=lambda: now[0])

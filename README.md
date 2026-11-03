@@ -18,6 +18,10 @@ Step by step: `job.wait()` returns a `pystac.ItemCollection` (empty while the jo
 assets=["tci"])` fetches chosen assets (names: `ms`, `tci`, `irp`, `ndvi`, and `*_10m` for the original-resolution files;
 older products offer only `ms` and `tci`). To follow a job you already created: `client.job("<job id>")`.
 
+`submit` spends credits and is **not** safe to retry: if it fails after the request was sent (a timeout, a lost answer) the
+job may exist, so check your jobs before submitting again. `wait` rides out a few transient errors (network, 5xx, 429),
+stops with `JobFailed` if the job failed, and says so if a job is `completed` but no product ever appears.
+
 ## Keys and safety
 
 - The key goes only to your API host: in the URL path for the job API (that is how the job API works today), in the
