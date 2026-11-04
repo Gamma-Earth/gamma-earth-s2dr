@@ -4,14 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gamma-earth-client"
-version = "0.1.0.dev0"
+version = "0.2.0.dev0"
 description = "Python client for the Gamma Earth S2DR3 API: submit a job, follow its STAC collection, download the products."
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = ["requests>=2.31", "pystac>=1.10"]
 
 [project.optional-dependencies]
-test = ["pytest>=8"]
+test = ["pytest>=8", "pystac-client>=0.8"]
+search = ["pystac-client>=0.8"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

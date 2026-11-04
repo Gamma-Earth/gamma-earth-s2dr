@@ -22,6 +22,27 @@ older products offer only `ms` and `tci`). To follow a job you already created: 
 job may exist, so check your jobs before submitting again. `wait` rides out a few transient errors (network, 5xx, 429),
 stops with `JobFailed` if the job failed, and says so if a job is `completed` but no product ever appears.
 
+## Search (0.2)
+
+```python
+client = Client()
+found = client.search(bbox=(30.9, 51.39, 30.94, 51.42), datetime=('2024-06-01', '2024-06-30'), max_clouds=20)
+found.products      # your finished products (collection s2dr3)
+found.scenes        # unprocessed Sentinel-2 scenes over that area, with a price shown
+found.warnings
+
+client.search(ids=['T36UUB-...'])            # by product id
+client.search(tile='36UUB', max_items=200)   # follow the next pages (at most 20)
+
+job = client.process(found.scenes[0])                       # NeedsConfirmation: shows the price, spends nothing
+job = client.process(found.scenes[0], confirm=True, max_credits=10)
+job.download('out/')                          # also writes out/collection.json
+```
+
+`client.catalog()` gives the API as a pystac `Catalog`; `client.pystac_client()` a `pystac_client.Client`
+(`pip install "gamma-earth-client[search]"`). After a download, `pystac.ItemCollection.from_file('out/collection.json')`
+works offline: it lists only the files you downloaded, by relative path, without the key or the API address.
+
 ## Keys and safety
 
 - The key goes only to your API host: in the URL path for the job API (that is how the job API works today), in the
