@@ -406,13 +406,26 @@ class Client:
 
     def pystac_client(self):
         """A pystac_client.Client for the API, with your key in the header (needs `pip install "gamma-earth-client[search]"`).
-        pystac-client sends that header on every request it makes, so use it for the API's own documents only; search(),
-        catalog() and download() are the calls that keep the key to the API host."""
+        The key is added only to requests to this API's /stac addresses; any other address raises, and a redirect is an error."""
         try:
             import pystac_client
         except ImportError:
             raise GammaEarthError('pystac-client is not installed: pip install "gamma-earth-client[search]"') from None
-        return pystac_client.Client.open(f'{self._api}/stac', headers={'X-API-Key': self._key})
+        # Client.open replaces the reader's request modifier with its own argument, so it is passed there too.
+        return pystac_client.Client.open(f'{self._api}/stac', stac_io=self._api_io(), request_modifier=self._only_the_api)
+
+    def _only_the_api(self, request):
+        url = request.url if isinstance(request.url, str) else ''
+        if url != f'{self._api}/stac' and not self._own(url.split('?')[0], 'stac'):
+            raise GammaEarthError('refusing to send a request that is not to the API host')
+        request.headers = {**(request.headers or {}), 'X-API-Key': self._key}
+        return request
+
+    def _api_io(self):
+        from pystac_client.stac_api_io import StacApiIO
+        io = StacApiIO(request_modifier=self._only_the_api)
+        io.session.max_redirects = 0
+        return io
 
     # --- download -----------------------------------------------------------------------------------------------
 
