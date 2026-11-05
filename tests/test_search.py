@@ -7,7 +7,7 @@ import pystac
 import pytest
 import requests
 
-from gamma_earth import Client, GammaEarthError, NeedsConfirmation
+from gamma_earth_s2dr import Client, GammaEarthError, NeedsConfirmation
 from test_client import API, KEY, PID, Response, Session, feature
 
 SEARCH = f'{API}/stac/search'
@@ -124,7 +124,7 @@ def test_an_error_from_the_api_is_an_error_with_its_text_and_no_key(status, text
 
 
 def test_a_503_is_retried_as_a_transient_error_only_by_the_caller():
-    from gamma_earth.client import TransientError
+    from gamma_earth_s2dr.client import TransientError
     c, _ = client({('POST', SEARCH): Response(503, {})})
     with pytest.raises(TransientError):
         c.search()

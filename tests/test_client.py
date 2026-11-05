@@ -1,7 +1,7 @@
 import pytest
 import requests
 
-from gamma_earth import Client, GammaEarthError, JobFailed, JobTimeout
+from gamma_earth_s2dr import Client, GammaEarthError, JobFailed, JobTimeout
 
 API = 'https://abc123.execute-api.eu-central-1.amazonaws.com/stage'
 KEY = 'k' * 32
@@ -322,7 +322,7 @@ def test_wait_rides_out_a_few_transient_errors():
 
 
 def test_wait_gives_up_after_too_many_transient_errors():
-    from gamma_earth.client import TransientError
+    from gamma_earth_s2dr.client import TransientError
     job, _ = make_job({('GET', STAC): Response(503, {}), ('GET', STATUS): Response(200, {'state': '50%'})})
     with pytest.raises(TransientError):          # not a timeout: it gave up on the errors
         job.wait(**ticking())

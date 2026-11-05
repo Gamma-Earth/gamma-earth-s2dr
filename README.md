@@ -1,13 +1,13 @@
-# gamma-earth-client
+# gamma-earth-s2dr
 
 Python client for the Gamma Earth S2DR3 hosted API. It submits a job, follows the job's STAC collection and downloads
 the products. It is **not** the Colab SDK (`ge-sdk`, which runs the model on your own GPU): this talks to the hosted API
 with your API key.
 
-> Status: 0.1 development version, tested against stage only. Nothing here is published to PyPI.
+> Status: 0.2 development version, tested against stage only. Nothing here is published to PyPI.
 
 ```python
-from gamma_earth import Client
+from gamma_earth_s2dr import Client
 
 client = Client()                       # GE_API_URL and GE_API_KEY from the environment, or Client(api_url, api_key)
 job = client.submit((30.906, 51.394, 30.936, 51.422), "2024-06-15")   # lon_min lat_min lon_max lat_max; spends credits
