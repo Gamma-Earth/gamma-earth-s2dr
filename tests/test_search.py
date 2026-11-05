@@ -364,44 +364,6 @@ def test_the_catalog_io_reports_an_error_status_without_the_key():
     assert '401' in str(e.value) and KEY not in str(e.value)
 
 
-def test_pystac_client_gets_the_key_only_on_requests_to_the_api_and_follows_no_redirect():
-    pytest.importorskip('pystac_client')
-    from pystac_client.exceptions import APIError
-    import requests as rq
-    c, _ = client({})
-    io = c._api_io()
-    assert io.session.max_redirects == 0
-    api = io._req_modifier(rq.Request('GET', f'{API}/stac/search'))
-    assert api.headers['X-API-Key'] == KEY
-    for url in ('https://evil.example/stac/x', f'{API}.evil.example/stac/x', f'{API}/jobs/x', 'http://' + API.split('//')[1] + '/stac/x'):
-        with pytest.raises(GammaEarthError):
-            io._req_modifier(rq.Request('GET', url))
-    assert 'X-API-Key' not in io.session.headers
-
-
-def test_pystac_client_is_opened_with_that_reader(monkeypatch):
-    pystac_client = pytest.importorskip('pystac_client')
-    seen = {}
-    monkeypatch.setattr(pystac_client.Client, 'open', classmethod(lambda cls, url, **kw: seen.update(url=url, **kw) or 'opened'))
-    c, _ = client({})
-    assert c.pystac_client() == 'opened' and seen['url'] == f'{API}/stac' and 'headers' not in seen
-    assert seen['stac_io'].session.max_redirects == 0
-
-
-def test_without_pystac_client_the_error_says_how_to_install_it(monkeypatch):
-    import builtins
-    real = builtins.__import__
-
-    def refuse(name, *a, **k):
-        if name == 'pystac_client':
-            raise ImportError('no')
-        return real(name, *a, **k)
-    monkeypatch.setattr(builtins, '__import__', refuse)
-    c, _ = client({})
-    with pytest.raises(GammaEarthError) as e:
-        c.pystac_client()
-    assert 'pip install' in str(e.value)
-
 
 # --- gaps found by the mutation check ---------------------------------------------------------------------------------------------------------------
 
@@ -528,22 +490,3 @@ def test_the_collection_file_keeps_no_asset_field_that_could_hold_an_address(tmp
     c.download(pystac.ItemCollection([pystac.Item.from_dict(f)]), tmp_path)
     assert 's3://' not in (tmp_path / 'collection.json').read_text()
 
-
-def test_pystac_client_does_not_follow_a_redirect_away_from_the_api(monkeypatch):
-    pytest.importorskip('pystac_client')
-    import requests as rq
-    sent_to = []
-
-    def fake_send(self, prepped, **kw):
-        sent_to.append((prepped.url, prepped.headers.get('X-API-Key')))
-        r = rq.Response()
-        r.status_code, r.url = 302, prepped.url
-        r.headers['Location'] = 'https://evil.example/x'
-        r._content = b''
-        r.request = prepped
-        return r
-    monkeypatch.setattr(rq.Session, 'send', fake_send)
-    c, _ = client({})
-    with pytest.raises(Exception):
-        c.pystac_client()
-    assert sent_to and all(u.startswith(API) and k == KEY for u, k in sent_to)

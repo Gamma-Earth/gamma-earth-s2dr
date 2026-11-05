@@ -38,9 +38,8 @@ job = client.process(found.scenes[0])                       # NeedsConfirmation:
 job = client.process(found.scenes[0], confirm=True, max_credits=10)
 job.download('out/')                          # also writes out/collection.json
 ```
-
-`client.catalog()` gives the API as a pystac `Catalog`; `client.pystac_client()` a `pystac_client.Client`
-(`pip install "gamma-earth-client[search]"`). After a download, `pystac.ItemCollection.from_file('out/collection.json')`
+`client.catalog()` gives the API as a pystac `Catalog` (browse the collection `s2dr3`); searching is `client.search()`, which
+returns pystac Items. After a download, `pystac.ItemCollection.from_file('out/collection.json')`
 works offline: it lists only the files you downloaded, by relative path, without the key or the API address.
 
 ## Keys and safety

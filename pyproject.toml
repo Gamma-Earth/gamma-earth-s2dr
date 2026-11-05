@@ -11,8 +11,7 @@ requires-python = ">=3.9"
 dependencies = ["requests>=2.31", "pystac>=1.10"]
 
 [project.optional-dependencies]
-test = ["pytest>=8", "pystac-client>=0.8"]
-search = ["pystac-client>=0.8"]
+test = ["pytest>=8"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
