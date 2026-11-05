@@ -513,8 +513,11 @@ class Job:
         link = data.get('stac_job')
         # Use the link the API gave only if it is on our API; otherwise build it from the job id.
         self.stac_job = link if client._own(link, 'stac/jobs') else f'{client._api}/stac/jobs/{self.job_id}'
+        note = data.get('credits_note')
+        # What the API says about the credits of this job, for example that it was a free repeat. Text only, cut, key removed.
+        self.credits_note = client._scrub(note)[:300] if isinstance(note, str) else None
         item = data.get('stac_item')
-        self.stac_item = item if client._own(item, 'stac/items') else (f'{client._api}/stac/items/{self.pid}' if self.pid else None)
+        self.stac_item =item if client._own(item, 'stac/items') else (f'{client._api}/stac/items/{self.pid}' if self.pid else None)
 
     def __repr__(self):
         return f'Job({self.job_id!r}, pid={self.pid!r})'

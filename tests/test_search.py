@@ -490,3 +490,25 @@ def test_the_collection_file_keeps_no_asset_field_that_could_hold_an_address(tmp
     c.download(pystac.ItemCollection([pystac.Item.from_dict(f)]), tmp_path)
     assert 's3://' not in (tmp_path / 'collection.json').read_text()
 
+
+
+# --- the job's note about credits (a free repeat) ----------------------------------------------------------------------------------------
+
+NOTE = 'No credits charged: this area and date were already processed with your API key.'
+
+
+def test_a_free_repeat_shows_the_note_of_the_job():
+    c, _ = client({('POST', JOBS): Response(200, dict(CREATED, credits_note=NOTE))})
+    assert c.process(scene_item(), confirm=True).credits_note == NOTE
+
+
+@pytest.mark.parametrize('note', [None, 5, ['x'], {'a': 1}])
+def test_a_missing_or_odd_note_is_none(note):
+    c, _ = client({('POST', JOBS): Response(200, dict(CREATED, credits_note=note))})
+    assert c.process(scene_item(), confirm=True).credits_note is None
+
+
+def test_the_note_is_cut_and_never_holds_the_key():
+    c, _ = client({('POST', JOBS): Response(200, dict(CREATED, credits_note=KEY + ' ' + 'x' * 1000))})
+    note = c.process(scene_item(), confirm=True).credits_note
+    assert KEY not in note and len(note) <= 300

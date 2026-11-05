@@ -38,6 +38,9 @@ job = client.process(found.scenes[0])                       # NeedsConfirmation:
 job = client.process(found.scenes[0], confirm=True, max_credits=10)
 job.download('out/')                          # also writes out/collection.json
 ```
+A product you already paid for is free to make again, and a search does not list scenes for an area and day you already
+have a product for. If a job turns out to be a free repeat, `job.credits_note` says so.
+
 `client.catalog()` gives the API as a pystac `Catalog` (browse the collection `s2dr3`); searching is `client.search()`, which
 returns pystac Items. After a download, `pystac.ItemCollection.from_file('out/collection.json')`
 works offline: it lists only the files you downloaded, by relative path, without the key or the API address.
