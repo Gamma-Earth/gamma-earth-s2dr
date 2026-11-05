@@ -8,6 +8,7 @@ import pytest
 import requests
 
 from gamma_earth_s2dr import Client, GammaEarthError, NeedsConfirmation
+from gamma_earth_s2dr.client import CLIENT_TAG
 from test_client import API, KEY, PID, Response, Session, feature
 
 SEARCH = f'{API}/stac/search'
@@ -203,7 +204,7 @@ def test_a_confirmed_process_submits_the_job_the_link_describes():
     job = c.process(scene_item(), confirm=True)
     assert job.job_id == 'j1'
     ((_, url, kw),) = s.calls
-    assert url == JOBS and kw['json'] == {'date': '2024-06-15', 'aoi': '30.9060000 51.3940000 30.9360000 51.4220000', 'date_range': 0, 'max_clouds': 100}
+    assert url == JOBS and kw['json'] == {'date': '2024-06-15', 'aoi': '30.9060000 51.3940000 30.9360000 51.4220000', 'date_range': 0, 'max_clouds': 100, 'client': CLIENT_TAG}
 
 
 def test_a_confirmation_can_be_limited_to_a_price():
@@ -512,3 +513,49 @@ def test_the_note_is_cut_and_never_holds_the_key():
     c, _ = client({('POST', JOBS): Response(200, dict(CREATED, credits_note=KEY + ' ' + 'x' * 1000))})
     note = c.process(scene_item(), confirm=True).credits_note
     assert KEY not in note and len(note) <= 300
+
+
+# --- the tag the API uses to count jobs made by the package (S2DR3P) ---------------------------------------------------------------------
+
+def test_every_job_carries_the_client_tag_the_api_recognises():
+    import re
+    from importlib import metadata
+    assert re.fullmatch(r'gamma-earth-s2dr/[A-Za-z0-9._-]{1,12}', CLIENT_TAG)
+    assert CLIENT_TAG == 'gamma-earth-s2dr/' + metadata.version('gamma-earth-s2dr')[:12]
+    c, s = client({('POST', JOBS): Response(200, CREATED)})
+    c.submit('30.906 51.394 30.936 51.422', '2024-06-15')
+    ((_, _, kw),) = s.calls
+    assert kw['json']['client'] == CLIENT_TAG
+
+
+def test_a_search_does_not_send_the_client_tag():
+    c, s = client({('POST', SEARCH): Response(200, page([]))})
+    c.search()
+    assert 'client' not in sent(s)['json']
+
+
+def test_the_tag_is_cleaned_and_cut_to_what_the_api_accepts(monkeypatch):
+    from importlib import metadata
+    from gamma_earth_s2dr import client as client_module
+    monkeypatch.setattr(metadata, 'version', lambda name: '1.2.3.dev12345+local/x y')
+    assert client_module._client_tag() == 'gamma-earth-s2dr/1.2.3.dev123'
+    monkeypatch.setattr(metadata, 'version', lambda name: '+/ ')
+    assert client_module._client_tag() is None
+
+
+def test_without_a_readable_version_no_tag_is_sent_and_the_job_is_still_created(monkeypatch):
+    from gamma_earth_s2dr import client as client_module
+    monkeypatch.setattr(client_module, 'CLIENT_TAG', None)
+    c, s = client({('POST', JOBS): Response(200, CREATED)})
+    assert c.submit('30.906 51.394 30.936 51.422', '2024-06-15').job_id == 'j1'
+    assert 'client' not in s.calls[0][2]['json']
+
+
+def test_a_package_that_is_not_installed_has_no_tag(monkeypatch):
+    from importlib import metadata
+    from gamma_earth_s2dr import client as client_module
+
+    def missing(name):
+        raise metadata.PackageNotFoundError(name)
+    monkeypatch.setattr(metadata, 'version', missing)
+    assert client_module._client_tag() is None

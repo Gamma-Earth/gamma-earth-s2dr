@@ -2,6 +2,7 @@ import pytest
 import requests
 
 from gamma_earth_s2dr import Client, GammaEarthError, JobFailed, JobTimeout
+from gamma_earth_s2dr.client import CLIENT_TAG
 
 API = 'https://abc123.execute-api.eu-central-1.amazonaws.com/stage'
 KEY = 'k' * 32
@@ -93,7 +94,7 @@ def test_submit_posts_the_job_and_returns_its_links():
     c, s = client({('POST', f'{API}/jobs/{KEY}'): Response(200, CREATED)})
     job = c.submit((30.906, 51.394, 30.936, 51.422), '2024-06-15')
     (_, _, kw), = s.calls
-    assert kw['json'] == {'date': '2024-06-15', 'aoi': '30.906 51.394 30.936 51.422', 'date_range': 7, 'max_clouds': 30}
+    assert kw['json'] == {'date': '2024-06-15', 'aoi': '30.906 51.394 30.936 51.422', 'date_range': 7, 'max_clouds': 30, 'client': CLIENT_TAG}
     assert (job.job_id, job.pid, job.stac_job) == ('j1', PID, f'{API}/stac/jobs/j1')
 
 

@@ -13,12 +13,25 @@ import math
 import os
 import re
 import time
+from importlib import metadata
 from pathlib import Path
 from urllib.parse import quote, urlsplit
 
 import pystac
 import requests
 
+
+def _client_tag():
+    """'gamma-earth-s2dr/<version>': the API counts jobs with this tag as made by the Python package (S2DR3P). None if the
+    installed version cannot be read."""
+    try:
+        version = re.sub(r'[^A-Za-z0-9._-]', '', metadata.version('gamma-earth-s2dr'))[:12]
+    except metadata.PackageNotFoundError:
+        return None
+    return f'gamma-earth-s2dr/{version}' if version else None
+
+
+CLIENT_TAG = _client_tag()
 TIFF_MAGIC = (b'II*\x00', b'MM\x00*', b'II+\x00', b'MM\x00+')
 TIMEOUT = 120
 MAX_TRANSIENT = 5                   # consecutive transient errors (network, 5xx, 429) that wait() rides out
@@ -236,6 +249,8 @@ class Client:
         """Create a job and return a Job. THIS SPENDS CREDITS. Do not retry blindly: if this raises after the request
         was sent (a timeout, a lost answer), the job may exist; look at your jobs before submitting again."""
         body = {'date': str(date), 'aoi': _aoi_text(aoi), 'date_range': int(date_range), 'max_clouds': int(max_clouds)}
+        if CLIENT_TAG:
+            body['client'] = CLIENT_TAG        # the API records the job as made by the Python package (S2DR3P)
         try:
             r = self._request('POST', self._jobs_url(), json=body)
         except GammaEarthError as e:

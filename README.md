@@ -45,6 +45,9 @@ have a product for. If a job turns out to be a free repeat, `job.credits_note` s
 returns pystac Items. After a download, `pystac.ItemCollection.from_file('out/collection.json')`
 works offline: it lists only the files you downloaded, by relative path, without the key or the API address.
 
+Every job created through this package carries `"client": "gamma-earth-s2dr/<version>"`, so the API records it as
+`S2DR3P` (P = Python package) in the usage report; plain API calls stay `S2DR3A`.
+
 ## Keys and safety
 
 - The key goes only to your API host: in the URL path for the job API (that is how the job API works today), in the
