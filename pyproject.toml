@@ -8,7 +8,23 @@ version = "0.2.0"
 description = "Python client for the Gamma Earth S2DR3 API: submit a job, follow its STAC collection, download the products."
 readme = "README.md"
 requires-python = ">=3.9"
+license = {text = "Apache-2.0"}
+authors = [{name = "Gamma Earth"}]
+keywords = ["sentinel-2", "super-resolution", "remote-sensing", "stac", "gamma-earth"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: GIS",
+]
 dependencies = ["requests>=2.31", "pystac>=1.10"]
+
+[project.urls]
+Repository = "https://github.com/Gamma-Earth/gamma-earth-s2dr"
+Issues = "https://github.com/Gamma-Earth/gamma-earth-s2dr/issues"
 
 [project.optional-dependencies]
 test = ["pytest>=8"]

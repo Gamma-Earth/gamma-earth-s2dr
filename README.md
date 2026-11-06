@@ -56,6 +56,11 @@ Every job created through this package carries `"client": "gamma-earth-s2dr/<ver
 - Downloads are written to `<name>.part` and renamed only when the size equals Content-Length and the file is a TIFF.
 - The default API is `https://api.gamma.earth`; `GE_API_URL` or `Client(api_url=...)` replace it (for example a test API). The key is always required.
 
+## License
+
+Apache License 2.0, Copyright 2026 Gamma Earth (see `LICENSE` and `NOTICE`). The license covers this client only, not the
+S2DR3 model, its wheel or the hosted API. Using the API needs an API key and credits.
+
 ## Develop
 
 ```
