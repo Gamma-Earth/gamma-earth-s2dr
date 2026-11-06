@@ -32,6 +32,7 @@ def _client_tag():
 
 
 CLIENT_TAG = _client_tag()
+DEFAULT_API_URL = 'https://api.gamma.earth'      # the public API; GE_API_URL or the api_url argument replace it
 TIFF_MAGIC = (b'II*\x00', b'MM\x00*', b'II+\x00', b'MM\x00+')
 TIMEOUT = 120
 MAX_TRANSIENT = 5                   # consecutive transient errors (network, 5xx, 429) that wait() rides out
@@ -199,10 +200,11 @@ class _KeyStacIO(pystac.StacIO):
 
 
 class Client:
-    """`Client(api_url, api_key)`. Both default to the environment variables GE_API_URL and GE_API_KEY."""
+    """`Client(api_url, api_key)`. They default to the environment variables GE_API_URL and GE_API_KEY; without an address
+    the public API, https://api.gamma.earth, is used. The key is always required."""
 
     def __init__(self, api_url=None, api_key=None, session=None):
-        api_url = (api_url or os.environ.get('GE_API_URL') or '').rstrip('/')
+        api_url = (api_url or os.environ.get('GE_API_URL') or DEFAULT_API_URL).rstrip('/')
         api_key = api_key or os.environ.get('GE_API_KEY') or ''
         if not api_url.startswith('https://'):
             raise ValueError('api_url (or GE_API_URL) must be an https URL')

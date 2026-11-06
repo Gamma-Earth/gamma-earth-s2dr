@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gamma-earth-s2dr"
-version = "0.2.0.dev0"
+version = "0.2.0"
 description = "Python client for the Gamma Earth S2DR3 API: submit a job, follow its STAC collection, download the products."
 readme = "README.md"
 requires-python = ">=3.9"

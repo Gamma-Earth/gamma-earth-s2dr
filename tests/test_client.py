@@ -371,3 +371,26 @@ def ticking():
     """A fake clock and the sleep that advances it, so a wait() that fails to stop times out instead of hanging."""
     now = [0.0]
     return dict(timeout=300, poll=20, sleep=lambda s: now.__setitem__(0, now[0] + s), clock=lambda: now[0])
+
+
+# --- the public address is the default ----------------------------------------------------------------------------------------------------
+
+def test_without_an_address_the_public_api_is_used(monkeypatch):
+    monkeypatch.delenv('GE_API_URL', raising=False)
+    assert Client(api_key=KEY)._api == 'https://api.gamma.earth'
+    monkeypatch.setenv('GE_API_KEY', KEY)
+    assert Client()._api == 'https://api.gamma.earth'
+
+
+def test_an_address_given_or_in_the_environment_wins_over_the_default(monkeypatch):
+    monkeypatch.setenv('GE_API_URL', API)
+    assert Client(api_key=KEY)._api == API
+    assert Client('https://other.example/', KEY)._api == 'https://other.example'
+
+
+def test_the_default_does_not_make_an_insecure_address_acceptable(monkeypatch):
+    monkeypatch.delenv('GE_API_URL', raising=False)
+    with pytest.raises(ValueError):
+        Client('http://api.gamma.earth', KEY)
+    with pytest.raises(ValueError):
+        Client(api_key='')
